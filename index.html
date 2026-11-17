@@ -46,298 +46,368 @@ button.muted{opacity:.5}
   <button id="sound" type="button" class="muted">♪ Звук</button>
 </footer>
 <script>
-(()=>{
-const WORDS=[
-"Я тебя люблю","I love you","Je t’aime","Ich liebe dich","Te quiero","Ti amo",
-"Eu te amo","Ik hou van je","Jag älskar dig","Jeg elsker deg","Minä rakastan sinua",
-"Kocham cię","Miluji tě","Szeretlek","Te iubesc","Σ’αγαπώ","Seni seviyorum",
-"Я цябе кахаю","Обичам те","Volim te","Ľúbim ťa","Ljubim te","Mi amas vin",
-"我爱你","愛してる","사랑해","أحبك","אני אוהב אותך","دوستت دارم",
-"मैं तुमसे प्यार करता हूँ","আমি তোমাকে ভালোবাসি","ฉันรักเธอ","Tôi yêu bạn",
-"Aku cinta kamu","Mahal kita","Ես քեզ սիրում եմ","მიყვარხარ","Мен сені сүйемін",
-"Men seni sevaman","Ma armastan sind","Es tevi mīlu","Aš tave myliu","Ég elska þig",
-"Ninakupenda","Tá grá agam duit","Rwy’n dy garu di","Aloha au iā ʻoe",
-"Aroha au ki a koe","Te amo","Jeg elsker dig",
-"Eg elskar deg","Ik hâld fan dy","Is breá liom tú","Volim te","Nakupenda","S'agapo",
-"Milujem ťa","Мен сені жақсы көремін","Unë të dua","Te dua","Āmo te","Alofa ia te oe",
-"Au domoni iko","Kei te aroha au ki a koe","Обичам те","Те сакам","Волим те",
-"Mīlu tevi","Myliu tave","Armastan sind","Ich hab dich lieb","Jeg elsker deg",
-"Rakastan sinua","Mám ťa rád","Мен сени жакшы көрөм","Seni sevaman"
-];
+(function () {
+  "use strict";
 
-const FONT='system-ui,"Segoe UI",Roboto,"Noto Sans",sans-serif';
-const cv=document.getElementById('c'),ctx=cv.getContext('2d');
-const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var PHRASES = [
+    "Я тебя люблю","I love you","Je t’aime","Ich liebe dich","Te quiero","Ti amo",
+    "Eu te amo","Ik hou van je","Jag älskar dig","Jeg elsker deg","Minä rakastan sinua",
+    "Kocham cię","Miluji tě","Szeretlek","Te iubesc","Σ’αγαπώ","Seni seviyorum",
+    "Я цябе кахаю","Обичам те","Volim te","Ľúbim ťa","Ljubim te","Mi amas vin",
+    "我爱你","愛してる","사랑해","أحبك","אני אוהב אותך","دوستت دارم",
+    "मैं तुमसे प्यार करता हूँ","আমি তোমাকে ভালোবাসি","ฉันรักเธอ","Tôi yêu bạn",
+    "Aku cinta kamu","Mahal kita","Ես քեզ սիրում եմ","მიყვარხარ","Мен сені сүйемін",
+    "Men seni sevaman","Ma armastan sind","Es tevi mīlu","Aš tave myliu","Ég elska þig",
+    "Ninakupenda","Tá grá agam duit","Rwy’n dy garu di","Aloha au iā ʻoe",
+    "Aroha au ki a koe","Te amo","Jeg elsker dig",
+    "Eg elskar deg","Ik hâld fan dy","Is breá liom tú","Volim te","Nakupenda","S'agapo",
+    "Milujem ťa","Мен сені жақсы көремін","Unë të dua","Te dua","Āmo te","Alofa ia te oe",
+    "Au domoni iko","Kei te aroha au ki a koe","Обичам те","Те сакам","Волим те",
+    "Mīlu tevi","Myliu tave","Armastan sind","Ich hab dich lieb","Jeg elsker deg",
+    "Rakastan sinua","Mám ťa rád","Мен сени жакшы көрөм","Seni sevaman"
+  ];
 
-let W=0,H=0,dpr=1,scale=1,cx=0,cy=0,fs=10;
-let items=[],rnd=[],t0=performance.now();
+  var FONT_STACK = 'system-ui,"Segoe UI",Roboto,"Noto Sans",sans-serif';
+  var SOUND_START = 100;
+  var VOLUME_ON = 0.85;
 
-const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
-const easeOut=p=>1-Math.pow(1-p,3);
-const isDark=()=>{const t=document.documentElement.dataset.theme;return t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches};
-const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d');
+  var btnAgain = document.getElementById('again');
+  var btnSound = document.getElementById('sound');
+  var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function seed(){
-  rnd=Array.from({length:800},()=>({
-    sx:Math.random(),sy:Math.random(),
-    ph:Math.random()*6.28,
-    d0:Math.random()*4.0,     // Разброс задержек старта слов увеличен для плавности
-    rot:(Math.random()-.5)*0.8,
-    r:Math.random()
-  }));
-}
+  var view = { w: 0, h: 0, dpr: 1 };
+  var heart = { scale: 1, cx: 0, cy: 0, fontSize: 10 };
+  var glyphs = [];
+  var particles = [];
+  var startedAt = performance.now();
 
-function inside(px,py){
-  const u=(px-cx)/scale;
-  const v=(cy-py)/scale+.13;
-  const a=u*u+v*v-1;
-  return a*a*a-u*u*v*v*v<=0;
-}
+  function clamp(v, min, max) {
+    return v < min ? min : v > max ? max : v;
+  }
 
-function layout(){
-  const r=cv.parentElement.getBoundingClientRect();
-  W=r.width;H=r.height;dpr=Math.min(devicePixelRatio||1,2);
-  cv.width=W*dpr;cv.height=H*dpr;
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  cx=W/2;cy=H/2;
+  function easeOutCubic(p) {
+    return 1 - Math.pow(1 - p, 3);
+  }
 
-  scale=Math.min(W*.48,H*.47);
-  fs=clamp(scale*.058,7,18);
+  function isDarkTheme() {
+    var forced = document.documentElement.dataset.theme;
+    if (forced) return forced === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
 
-  const lh=fs*1.45,gapMin=fs*.55;
-  ctx.font=`500 ${fs}px ${FONT}`;
-  const order=shuffle(WORDS.slice());
-  const widths=order.map(w=>ctx.measureText(w).width);
-  const hw=ctx.measureText('♥').width;
-  const top=cy-1.13*scale,bot=cy+1.13*scale;
-  const out=[];let k=0;
-
-  for(let y=top+lh/2;y<bot-lh*.3;y+=lh){
-    const runs=[];let a=null;
-    for(let x=cx-1.2*scale;x<=cx+1.2*scale;x++){
-      const ok=inside(x,y)&&inside(x,y-fs*.5)&&inside(x,y+fs*.5);
-      if(ok&&a===null)a=x;
-      if(!ok&&a!==null){runs.push([a+2,x-2]);a=null}
+  function shuffled(arr) {
+    var out = arr.slice();
+    for (var i = out.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = out[i]; out[i] = out[j]; out[j] = tmp;
     }
-    for(const [a0,b0] of runs){
-      const L=b0-a0;
-      if(L<fs)continue;
-      const row=[];let used=0;
-      for(;;){
-        let pick=-1;
-        for(let j=0;j<order.length;j++){
-          const i=(k+j)%order.length;
-          if(used+widths[i]+(row.length?gapMin:0)<=L){pick=i;break}
+    return out;
+  }
+
+  function makeParticles() {
+    particles = [];
+    for (var i = 0; i < 800; i++) {
+      particles.push({
+        sx: Math.random(),
+        sy: Math.random(),
+        phase: Math.random() * Math.PI * 2,
+        delay: Math.random() * 4.0,
+        rot: (Math.random() - 0.5) * 0.8,
+        rand: Math.random()
+      });
+    }
+  }
+
+  function pointInsideHeart(px, py) {
+    var u = (px - heart.cx) / heart.scale;
+    var v = (heart.cy - py) / heart.scale + 0.13;
+    var a = u * u + v * v - 1;
+    return a * a * a - u * u * v * v * v <= 0;
+  }
+
+  function layout() {
+    var rect = canvas.parentElement.getBoundingClientRect();
+    view.w = rect.width;
+    view.h = rect.height;
+    view.dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    canvas.width = view.w * view.dpr;
+    canvas.height = view.h * view.dpr;
+    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+
+    heart.cx = view.w / 2;
+    heart.cy = view.h / 2;
+    heart.scale = Math.min(view.w * 0.48, view.h * 0.47);
+    heart.fontSize = clamp(heart.scale * 0.058, 7, 18);
+
+    var lineHeight = heart.fontSize * 1.45;
+    var minGap = heart.fontSize * 0.55;
+    var fs = heart.fontSize;
+
+    ctx.font = '500 ' + fs + 'px ' + FONT_STACK;
+
+    var pool = shuffled(PHRASES);
+    var widths = pool.map(function (w) { return ctx.measureText(w).width; });
+    var heartCharWidth = ctx.measureText('♥').width;
+
+    var top = heart.cy - 1.13 * heart.scale;
+    var bottom = heart.cy + 1.13 * heart.scale;
+    var result = [];
+    var cursor = 0;
+
+    for (var y = top + lineHeight / 2; y < bottom - lineHeight * 0.3; y += lineHeight) {
+      var runs = [];
+      var runStart = null;
+
+      for (var x = heart.cx - 1.2 * heart.scale; x <= heart.cx + 1.2 * heart.scale; x++) {
+        var ok = pointInsideHeart(x, y)
+              && pointInsideHeart(x, y - fs * 0.5)
+              && pointInsideHeart(x, y + fs * 0.5);
+        if (ok && runStart === null) runStart = x;
+        if (!ok && runStart !== null) {
+          runs.push([runStart + 2, x - 2]);
+          runStart = null;
         }
-        if(pick<0)break;
-        used+=widths[pick]+(row.length?gapMin:0);
-        row.push({text:order[pick],w:widths[pick]});
-        k=pick+1;
       }
-      if(!row.length){
-        if(hw<=L)row.push({text:'♥',w:hw});
-        else continue;
+
+      for (var r = 0; r < runs.length; r++) {
+        var from = runs[r][0];
+        var to = runs[r][1];
+        var span = to - from;
+        if (span < fs) continue;
+
+        var row = [];
+        var used = 0;
+
+        for (;;) {
+          var picked = -1;
+          for (var j = 0; j < pool.length; j++) {
+            var idx = (cursor + j) % pool.length;
+            var needed = used + widths[idx] + (row.length ? minGap : 0);
+            if (needed <= span) { picked = idx; break; }
+          }
+          if (picked < 0) break;
+          used += widths[picked] + (row.length ? minGap : 0);
+          row.push({ text: pool[picked], w: widths[picked] });
+          cursor = picked + 1;
+        }
+
+        if (!row.length) {
+          if (heartCharWidth <= span) row.push({ text: '♥', w: heartCharWidth });
+          else continue;
+        }
+
+        var n = row.length;
+        var sumW = row.reduce(function (s, o) { return s + o.w; }, 0);
+        var gap = n > 1 ? Math.min((span - sumW) / (n - 1), fs * 2.2) : 0;
+        var cursorX = from + (span - (sumW + gap * (n - 1))) / 2;
+
+        for (var k = 0; k < row.length; k++) {
+          var item = row[k];
+          result.push({ text: item.text, x: cursorX + item.w / 2, y: y });
+          cursorX += item.w + gap;
+        }
       }
-      const n=row.length;
-      const sumW=row.reduce((s,o)=>s+o.w,0);
-      const gap=n>1?Math.min((L-sumW)/(n-1),fs*2.2):0;
-      let x=a0+(L-(sumW+gap*(n-1)))/2;
-      for(const o of row){
-        out.push({text:o.text,x:x+o.w/2,y});
-        x+=o.w+gap;
-      }
+    }
+
+    glyphs = result.map(function (o, i) {
+      var p = particles[i % particles.length];
+      return {
+        text: o.text,
+        x: o.x,
+        y: o.y,
+        nx: p.sx,
+        ny: p.sy,
+        phase: p.phase,
+        delay: p.delay,
+        rot: p.rot,
+        rand: p.rand,
+        heightRatio: (o.y - top) / (bottom - top),
+        drawDur: 2.5 + p.rand * 2.5
+      };
+    });
+  }
+
+  function heartbeat(t) {
+    var m = t % 1.7;
+    return Math.exp(-Math.pow((m - 0.12) / 0.07, 2))
+         + 0.7 * Math.exp(-Math.pow((m - 0.4) / 0.09, 2));
+  }
+
+  var audio = new Audio('angel.mp3');
+  audio.volume = 0;
+  audio.preload = 'auto';
+
+  var soundEnabled = false;
+  var fadeTimer = null;
+  var seekApplied = false;
+
+  function applySeek() {
+    if (!seekApplied && audio.duration > SOUND_START) {
+      audio.currentTime = SOUND_START;
+      seekApplied = true;
     }
   }
 
-  items=out.map((o,i)=>{
-    const q=rnd[i%rnd.length];
-    return Object.assign(o,q,{
-      ny:(o.y-top)/(bot-top),
-      d1:clamp(Math.hypot(o.x-cx,o.y-cy)/(1.2*scale),0,1)*2.0+q.r*.8,
-      // Увеличенное время прорисовки для каждого слова
-      drawDur:2.5+q.r*2.5
-    });
+  audio.addEventListener('loadedmetadata', applySeek);
+  audio.addEventListener('play', applySeek);
+  audio.addEventListener('ended', function () {
+    audio.currentTime = SOUND_START;
+    audio.play();
   });
-}
 
-const beat=t=>{
-  const m=t%1.7;
-  return Math.exp(-Math.pow((m-.12)/.07,2))+.7*Math.exp(-Math.pow((m-.4)/.09,2));
-};
-
-/* ---------- АУДИО ---------- */
-const audioEl = new Audio('angel.mp3');
-audioEl.volume = 0;
-audioEl.preload = 'auto';
-
-const START_AT = 100;
-
-let soundOn = false;
-let fadeTimer = null;
-let seekDone = false;
-
-audioEl.addEventListener('loadedmetadata', () => {
-  if (!seekDone && audioEl.duration > START_AT) {
-    audioEl.currentTime = START_AT;
-    seekDone = true;
+  function fadeVolume(target, duration) {
+    if (fadeTimer) clearInterval(fadeTimer);
+    var from = audio.volume;
+    var steps = 40;
+    var i = 0;
+    fadeTimer = setInterval(function () {
+      i++;
+      var k = i / steps;
+      audio.volume = Math.min(1, Math.max(0, from + (target - from) * k));
+      if (i >= steps) {
+        clearInterval(fadeTimer);
+        fadeTimer = null;
+        if (target === 0) audio.pause();
+      }
+    }, duration / steps);
   }
-});
-audioEl.addEventListener('ended', () => {
-  audioEl.currentTime = START_AT;
-  audioEl.play();
-});
-audioEl.addEventListener('play', () => {
-  if (!seekDone && audioEl.duration > START_AT) {
-    audioEl.currentTime = START_AT;
-    seekDone = true;
+
+  function setSoundUi(on) {
+    if (on) {
+      btnSound.classList.remove('muted');
+      btnSound.textContent = '♪ Звук вкл';
+    } else {
+      btnSound.classList.add('muted');
+      btnSound.textContent = '♪ Звук';
+    }
   }
-});
 
-function fadeTo(target, duration = 1200) {
-  if (fadeTimer) clearInterval(fadeTimer);
-  const start = audioEl.volume;
-  const steps = 40;
-  let i = 0;
-  fadeTimer = setInterval(() => {
-    i++;
-    const k = i / steps;
-    audioEl.volume = Math.min(1, Math.max(0, start + (target - start) * k));
-    if (i >= steps) {
-      clearInterval(fadeTimer);
-      fadeTimer = null;
-      if (target === 0) audioEl.pause();
+  function enableSound() {
+    if (audio.duration > SOUND_START) {
+      audio.currentTime = SOUND_START;
+      seekApplied = true;
     }
-  }, duration / steps);
-}
-
-function toggleSound() {
-  soundOn = !soundOn;
-  const btn = document.getElementById('sound');
-  if (soundOn) {
-    if (audioEl.duration > START_AT) {
-      audioEl.currentTime = START_AT;
-      seekDone = true;
-    }
-    audioEl.play().then(() => {
-      fadeTo(0.85, 3000); // Более медленное нарастание музыки (3 секунды)
-      btn.classList.remove('muted');
-      btn.textContent = '♪ Звук вкл';
-    }).catch(err => {
-      console.warn('Не удалось запустить аудио:', err);
-      soundOn = false;
+    return audio.play().then(function () {
+      fadeVolume(VOLUME_ON, 3000);
+      setSoundUi(true);
     });
-  } else {
-    fadeTo(0, 1500);
-    btn.classList.add('muted');
-    btn.textContent = '♪ Звук';
   }
-}
 
-function firstTouchSound() {
-  if (!soundOn) {
-    soundOn = true;
-    const btn = document.getElementById('sound');
-    if (audioEl.duration > START_AT) {
-      audioEl.currentTime = START_AT;
-      seekDone = true;
+  function toggleSound() {
+    soundEnabled = !soundEnabled;
+    if (soundEnabled) {
+      enableSound().catch(function (err) {
+        console.warn('audio failed', err);
+        soundEnabled = false;
+        setSoundUi(false);
+      });
+    } else {
+      fadeVolume(0, 1500);
+      setSoundUi(false);
     }
-    audioEl.play().then(() => {
-      fadeTo(0.85, 3000);
-      btn.classList.remove('muted');
-      btn.textContent = '♪ Звук вкл';
-    }).catch(() => { soundOn = false; });
-  }
-  cv.removeEventListener('click', firstTouchSound);
-}
-
-/* ---------- АНИМАЦИЯ ---------- */
-function frame(now){
-  const t=(now-t0)/1000;
-  const dark=isDark();
-
-  ctx.clearRect(0,0,W,H);
-
-  // Общая волна "свечения" сердца стала более затяжной
-  const appear=easeOut(clamp((t-0.4)/8.0,0,1));
-  const beatAmt=reduce?0:beat(t);
-  const s=1+.03*beatAmt*appear;
-
-  if(appear>0){
-    const c=dark?'255,70,120':'225,29,72';
-    const rg=ctx.createRadialGradient(cx,cy,0,cx,cy,scale*1.3*s);
-    rg.addColorStop(0,`rgba(${c},${.22*appear*(dark?1:.55)})`);
-    rg.addColorStop(1,`rgba(${c},0)`);
-    ctx.fillStyle=rg;
-    ctx.fillRect(0,0,W,H);
   }
 
-  ctx.textAlign='center';
-  ctx.textBaseline='middle';
+  function handleCanvasTap() {
+    replay();
+    if (!soundEnabled) {
+      soundEnabled = true;
+      enableSound().catch(function () { soundEnabled = false; });
+    }
+    canvas.removeEventListener('click', handleCanvasTap);
+  }
 
-  for(const it of items){
-    // Слова начинают появляться с большей задержкой (до 4 секунд)
-    const local = clamp((t - 0.4 - it.d0*3.0) / it.drawDur, 0, 1);
-    if(local <= 0) continue;
+  function drawWord(it, t, appear, dark, pulse) {
+    var local = clamp((t - 0.4 - it.delay * 3.0) / it.drawDur, 0, 1);
+    if (local <= 0) return;
 
-    const p = easeOut(local);
-    const w = 1 - p;
+    var p = easeOutCubic(local);
+    var w = 1 - p;
 
-    const sx = it.sx * W + Math.sin(t*0.4 + it.ph) * 10 * w;
-    const sy = it.sy * H + Math.cos(t*0.3 + it.ph*1.3) * 10 * w;
-    const tx = cx + (it.x - cx) * s;
-    const ty = cy + (it.y - cy) * s;
+    var sx = it.nx * view.w + Math.sin(t * 0.4 + it.phase) * 10 * w;
+    var sy = it.ny * view.h + Math.cos(t * 0.3 + it.phase * 1.3) * 10 * w;
+    var tx = heart.cx + (it.x - heart.cx) * pulse;
+    var ty = heart.cy + (it.y - heart.cy) * pulse;
 
-    // Более медленный и плавный полет
-    const x = sx + (tx - sx) * p;
-    const y = sy + (ty - sy) * p;
+    var x = sx + (tx - sx) * p;
+    var y = sy + (ty - sy) * p;
 
-    const hue = 352 - 20 * it.ny;
-    const sat = 25 + 60 * p;
-    const l = (dark ? 68 : 44) + appear * 5 * Math.sin(t*1.5 + it.ph);
+    var hue = 352 - 20 * it.heightRatio;
+    var sat = 25 + 60 * p;
+    var light = (dark ? 68 : 44) + appear * 5 * Math.sin(t * 1.5 + it.phase);
 
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(w * it.rot);
-
     ctx.globalAlpha = p;
 
-    if(p > 0.15){
-      ctx.shadowColor = `hsla(${hue}, 80%, ${dark?70:60}%, ${0.35 * p})`;
+    if (p > 0.15) {
+      ctx.shadowColor = 'hsla(' + hue + ', 80%, ' + (dark ? 70 : 60) + '%, ' + (0.35 * p) + ')';
       ctx.shadowBlur = 12 * p;
     }
 
-    ctx.fillStyle = `hsl(${hue} ${sat}% ${l}%)`;
-    const wordScale = 0.72 + 0.28 * p;
-    ctx.font = `500 ${fs * wordScale * s}px ${FONT}`;
+    ctx.fillStyle = 'hsl(' + hue + ' ' + sat + '% ' + light + '%)';
+    var wordScale = 0.72 + 0.28 * p;
+    ctx.font = '500 ' + (heart.fontSize * wordScale * pulse) + 'px ' + FONT_STACK;
 
-    const tw = ctx.measureText(it.text).width;
-    const revealW = tw * p;
+    var tw = ctx.measureText(it.text).width;
+    var revealW = tw * p;
     ctx.beginPath();
-    ctx.rect(-tw/2 - 2, -fs, revealW + 4, fs*2);
+    ctx.rect(-tw / 2 - 2, -heart.fontSize, revealW + 4, heart.fontSize * 2);
     ctx.clip();
 
     ctx.fillText(it.text, 0, 0);
-
     ctx.restore();
   }
 
-  requestAnimationFrame(frame);
-}
+  function frame(now) {
+    var t = (now - startedAt) / 1000;
+    var dark = isDarkTheme();
 
-function replay(){
-  seed();
+    ctx.clearRect(0, 0, view.w, view.h);
+
+    var appear = easeOutCubic(clamp((t - 0.4) / 8.0, 0, 1));
+    var beatAmt = reducedMotion ? 0 : heartbeat(t);
+    var pulse = 1 + 0.03 * beatAmt * appear;
+
+    if (appear > 0) {
+      var rgb = dark ? '255,70,120' : '225,29,72';
+      var grad = ctx.createRadialGradient(
+        heart.cx, heart.cy, 0,
+        heart.cx, heart.cy, heart.scale * 1.3 * pulse
+      );
+      grad.addColorStop(0, 'rgba(' + rgb + ',' + (0.22 * appear * (dark ? 1 : 0.55)) + ')');
+      grad.addColorStop(1, 'rgba(' + rgb + ',0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, view.w, view.h);
+    }
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (var i = 0; i < glyphs.length; i++) {
+      drawWord(glyphs[i], t, appear, dark, pulse);
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  function replay() {
+    makeParticles();
+    layout();
+    startedAt = performance.now();
+  }
+
+  btnAgain.addEventListener('click', replay);
+  btnSound.addEventListener('click', toggleSound);
+  canvas.addEventListener('click', handleCanvasTap);
+  new ResizeObserver(function () { layout(); }).observe(canvas.parentElement);
+
+  makeParticles();
   layout();
-  t0=performance.now();
-}
-
-document.getElementById('again').addEventListener('click',replay);
-document.getElementById('sound').addEventListener('click',toggleSound);
-cv.addEventListener('click',()=>{replay();firstTouchSound();});
-new ResizeObserver(()=>layout()).observe(cv.parentElement);
-
-seed();
-layout();
-requestAnimationFrame(frame);
+  requestAnimationFrame(frame);
 })();
 </script>
 </body>
